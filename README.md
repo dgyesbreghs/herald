@@ -1,5 +1,11 @@
 # Herald
 
+[![CI](https://github.com/dgyesbreghs/herald/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/dgyesbreghs/herald/actions/workflows/ci.yml)
+[![Publish](https://github.com/dgyesbreghs/herald/actions/workflows/publish.yml/badge.svg)](https://github.com/dgyesbreghs/herald/actions/workflows/publish.yml)
+[![NuGet](https://img.shields.io/nuget/v/Herald.svg)](https://www.nuget.org/packages/Herald)
+[![NuGet downloads](https://img.shields.io/nuget/dt/Herald.svg)](https://www.nuget.org/packages/Herald)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 Minimal in-process mediator for .NET. Send requests, resolve handlers via DI, nothing more.
 
 - Request/response dispatch through `IMediator.Send`
@@ -10,8 +16,24 @@ Minimal in-process mediator for .NET. Send requests, resolve handlers via DI, no
 
 ## Install
 
+Herald is available on [NuGet](https://www.nuget.org/packages/Herald) and targets .NET 8 and later.
+
+Using the .NET CLI:
+
 ```bash
 dotnet add package Herald
+```
+
+Or add a package reference to your project file:
+
+```xml
+<PackageReference Include="Herald" Version="1.*" />
+```
+
+Or with [central package management](https://learn.microsoft.com/nuget/consume-packages/central-package-management) in `Directory.Packages.props`:
+
+```xml
+<PackageVersion Include="Herald" Version="1.*" />
 ```
 
 ## Usage
