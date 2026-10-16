@@ -1,3 +1,5 @@
+<p align="center"><img src="https://raw.githubusercontent.com/dgyesbreghs/herald/main/assets/icon-512.png" width="112" alt="Herald icon"></p>
+
 # Herald
 
 [![CI](https://github.com/dgyesbreghs/herald/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/dgyesbreghs/herald/actions/workflows/ci.yml)

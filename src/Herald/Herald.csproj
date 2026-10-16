@@ -13,6 +13,7 @@
     <PackageTags>mediator;cqrs;dependency-injection;request;handler</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
     <PackageProjectUrl>https://github.com/dgyesbreghs/herald</PackageProjectUrl>
     <RepositoryUrl>https://github.com/dgyesbreghs/herald</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
@@ -28,6 +29,7 @@
 
   <ItemGroup>
     <None Include="../../README.md" Pack="true" PackagePath="/" />
+    <None Include="../../assets/icon-128.png" Pack="true" PackagePath="/icon.png" />
   </ItemGroup>
 
 </Project>
