@@ -1,21 +1,23 @@
 using System.Collections.Concurrent;
-using Microsoft.Extensions.DependencyInjection;
+using Herald.Internal;
 
 namespace Herald;
 
 /// <summary>
-/// The default <see cref="IMediator"/> implementation, resolving handlers from the <see cref="IServiceProvider"/>.
+/// The default <see cref="IMediator"/> implementation, resolving handlers and behaviors from the <see cref="IServiceProvider"/>.
 /// </summary>
 public sealed class Mediator(IServiceProvider serviceProvider) : IMediator
 {
-    private static readonly ConcurrentDictionary<Type, RequestHandlerWrapper> Wrappers = new();
+    private static readonly ConcurrentDictionary<Type, RequestHandlerWrapper> RequestHandlers = new();
+    private static readonly ConcurrentDictionary<Type, VoidRequestHandlerWrapper> VoidRequestHandlers = new();
+    private static readonly ConcurrentDictionary<Type, NotificationHandlerWrapper> NotificationHandlers = new();
 
     /// <inheritdoc />
     public Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var wrapper = (RequestHandlerWrapper<TResponse>)Wrappers.GetOrAdd(
+        var wrapper = (RequestHandlerWrapper<TResponse>)RequestHandlers.GetOrAdd(
             request.GetType(),
             static requestType => (RequestHandlerWrapper)Activator.CreateInstance(
                 typeof(RequestHandlerWrapper<,>).MakeGenericType(requestType, typeof(TResponse)))!);
@@ -23,19 +25,30 @@ public sealed class Mediator(IServiceProvider serviceProvider) : IMediator
         return wrapper.Handle(request, serviceProvider, cancellationToken);
     }
 
-    private abstract class RequestHandlerWrapper;
-
-    private abstract class RequestHandlerWrapper<TResponse> : RequestHandlerWrapper
+    /// <inheritdoc />
+    public Task Send(IRequest request, CancellationToken cancellationToken = default)
     {
-        public abstract Task<TResponse> Handle(IRequest<TResponse> request, IServiceProvider serviceProvider, CancellationToken cancellationToken);
+        ArgumentNullException.ThrowIfNull(request);
+
+        var wrapper = VoidRequestHandlers.GetOrAdd(
+            request.GetType(),
+            static requestType => (VoidRequestHandlerWrapper)Activator.CreateInstance(
+                typeof(VoidRequestHandlerWrapper<>).MakeGenericType(requestType))!);
+
+        return wrapper.Handle(request, serviceProvider, cancellationToken);
     }
 
-    private sealed class RequestHandlerWrapper<TRequest, TResponse> : RequestHandlerWrapper<TResponse>
-        where TRequest : IRequest<TResponse>
+    /// <inheritdoc />
+    public Task Publish<TNotification>(TNotification notification, CancellationToken cancellationToken = default)
+        where TNotification : INotification
     {
-        public override Task<TResponse> Handle(IRequest<TResponse> request, IServiceProvider serviceProvider, CancellationToken cancellationToken)
-            => serviceProvider
-                .GetRequiredService<IRequestHandler<TRequest, TResponse>>()
-                .Handle((TRequest)request, cancellationToken);
+        ArgumentNullException.ThrowIfNull(notification);
+
+        var wrapper = NotificationHandlers.GetOrAdd(
+            notification.GetType(),
+            static notificationType => (NotificationHandlerWrapper)Activator.CreateInstance(
+                typeof(NotificationHandlerWrapper<>).MakeGenericType(notificationType))!);
+
+        return wrapper.Handle(notification, serviceProvider, cancellationToken);
     }
 }

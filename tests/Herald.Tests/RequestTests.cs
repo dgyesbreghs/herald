@@ -4,16 +4,12 @@ using NUnit.Framework;
 namespace Herald.Tests;
 
 [TestFixture]
-public class MediatorTest
+public class RequestTests
 {
-    private static ServiceProvider BuildProvider() => new ServiceCollection()
-        .AddHeraldFromAssemblyContaining<MediatorTest>()
-        .BuildServiceProvider();
-
     [Test]
     public async Task Send_DispatchesToRegisteredHandler()
     {
-        await using var provider = BuildProvider();
+        await using var provider = TestServices.Build();
         var mediator = provider.GetRequiredService<IMediator>();
 
         var response = await mediator.Send(new PingRequest("hello"));
@@ -24,10 +20,10 @@ public class MediatorTest
     [Test]
     public async Task Send_SupportsUnitResponse()
     {
-        await using var provider = BuildProvider();
+        await using var provider = TestServices.Build();
         var mediator = provider.GetRequiredService<IMediator>();
 
-        var response = await mediator.Send(new VoidRequest());
+        var response = await mediator.Send(new UnitRequest());
 
         Assert.That(response, Is.EqualTo(Unit.Value));
     }
@@ -35,7 +31,7 @@ public class MediatorTest
     [Test]
     public async Task Send_PassesCancellationToken()
     {
-        await using var provider = BuildProvider();
+        await using var provider = TestServices.Build();
         var mediator = provider.GetRequiredService<IMediator>();
         using var cts = new CancellationTokenSource();
         await cts.CancelAsync();
@@ -55,35 +51,26 @@ public class MediatorTest
     [Test]
     public void Send_WithNullRequest_Throws()
     {
-        using var provider = BuildProvider();
+        using var provider = TestServices.Build();
         var mediator = provider.GetRequiredService<IMediator>();
 
         Assert.ThrowsAsync<ArgumentNullException>(() => mediator.Send<string>(null!));
     }
 
     [Test]
-    public void AddHerald_SkipsAbstractAndOpenGenericHandlers()
+    public async Task Send_ThroughISender_DispatchesToRegisteredHandler()
     {
-        var services = new ServiceCollection().AddHeraldFromAssemblyContaining<MediatorTest>();
+        await using var provider = TestServices.Build();
+        var sender = provider.GetRequiredService<ISender>();
 
-        Assert.That(services.Any(d => d.ImplementationType == typeof(AbstractHandler)), Is.False);
-        Assert.That(services.Any(d => d.ImplementationType == typeof(PingHandler)), Is.True);
-    }
+        var response = await sender.Send(new PingRequest("hi"));
 
-    [Test]
-    public void AddHerald_CalledTwice_DoesNotDuplicateRegistrations()
-    {
-        var services = new ServiceCollection()
-            .AddHeraldFromAssemblyContaining<MediatorTest>()
-            .AddHeraldFromAssemblyContaining<MediatorTest>();
-
-        Assert.That(services.Count(d => d.ServiceType == typeof(IMediator)), Is.EqualTo(1));
-        Assert.That(services.Count(d => d.ImplementationType == typeof(PingHandler)), Is.EqualTo(1));
+        Assert.That(response, Is.EqualTo("hi pong"));
     }
 
     public sealed record PingRequest(string Message) : IRequest<string>;
 
-    public sealed record VoidRequest : IRequest<Unit>;
+    public sealed record UnitRequest : IRequest<Unit>;
 
     public sealed record DelayRequest : IRequest<Unit>;
 
@@ -93,9 +80,9 @@ public class MediatorTest
             => Task.FromResult($"{request.Message} pong");
     }
 
-    public sealed class VoidHandler : IRequestHandler<VoidRequest, Unit>
+    public sealed class UnitHandler : IRequestHandler<UnitRequest, Unit>
     {
-        public Task<Unit> Handle(VoidRequest request, CancellationToken cancellationToken) => Unit.Task;
+        public Task<Unit> Handle(UnitRequest request, CancellationToken cancellationToken) => Unit.Task;
     }
 
     public sealed class DelayHandler : IRequestHandler<DelayRequest, Unit>
@@ -105,10 +92,5 @@ public class MediatorTest
             await Task.Delay(Timeout.Infinite, cancellationToken);
             return Unit.Value;
         }
-    }
-
-    public abstract class AbstractHandler : IRequestHandler<PingRequest, string>
-    {
-        public abstract Task<string> Handle(PingRequest request, CancellationToken cancellationToken);
     }
 }

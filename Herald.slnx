@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/samples/">
+    <Project Path="samples/Herald.Samples.WebApi/Herald.Samples.WebApi.csproj" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/Herald/Herald.csproj" />
   </Folder>
