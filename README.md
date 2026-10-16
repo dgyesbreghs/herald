@@ -6,11 +6,12 @@
 [![NuGet downloads](https://img.shields.io/nuget/dt/Herald.svg)](https://www.nuget.org/packages/Herald)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Minimal in-process mediator for .NET. Send requests, resolve handlers via DI, nothing more.
+Minimal in-process mediator for .NET: requests, notifications and pipeline behaviors, resolved via DI.
 
-- Request/response dispatch through `IMediator.Send`
+- **Requests** with or without a response, dispatched to exactly one handler via `ISender.Send`
+- **Notifications** published to any number of handlers via `IPublisher.Publish`
+- **Pipeline behaviors** to wrap requests in logging, validation, transactions, …
 - Handlers resolved from `Microsoft.Extensions.DependencyInjection`
-- No pipelines, notifications or streaming — just the part most apps actually use
 - Familiar API if you're coming from MediatR
 - MIT licensed, single dependency (`Microsoft.Extensions.DependencyInjection.Abstractions`)
 
@@ -36,69 +37,138 @@ Or with [central package management](https://learn.microsoft.com/nuget/consume-p
 <PackageVersion Include="Herald" Version="1.*" />
 ```
 
-## Usage
-
-Define a request and its handler:
-
-```csharp
-using Herald;
-
-public sealed record GetUserRequest(int Id) : IRequest<UserDto>;
-
-public sealed class GetUserHandler(IUserRepository users) : IRequestHandler<GetUserRequest, UserDto>
-{
-    public async Task<UserDto> Handle(GetUserRequest request, CancellationToken cancellationToken)
-        => await users.GetAsync(request.Id, cancellationToken);
-}
-```
+## Getting started
 
 Register Herald and every handler in an assembly:
 
 ```csharp
-builder.Services.AddHeraldFromAssemblyContaining<GetUserHandler>();
-// or: builder.Services.AddHerald(typeof(GetUserHandler).Assembly, typeof(Other).Assembly);
+builder.Services.AddHerald(herald => herald
+    .RegisterServicesFromAssemblyContaining<Program>()
+    .AddOpenBehavior(typeof(LoggingBehavior<,>)));
+
+// Or, without behaviors:
+builder.Services.AddHeraldFromAssemblyContaining<Program>();
 ```
 
-Send requests:
+Then inject `ISender`, `IPublisher` or `IMediator` (both) where you need them.
+
+A runnable example lives in [`samples/Herald.Samples.WebApi`](samples/Herald.Samples.WebApi): a small todo API using every feature below.
+
+```bash
+dotnet run --project samples/Herald.Samples.WebApi
+```
+
+## Requests
+
+A request with a response, and its handler:
 
 ```csharp
-public sealed class UsersController(IMediator mediator) : ControllerBase
+public sealed record GetUserQuery(int Id) : IRequest<UserDto>;
+
+public sealed class GetUserHandler(IUserRepository users) : IRequestHandler<GetUserQuery, UserDto>
 {
-    [HttpGet("{id:int}")]
-    public Task<UserDto> Get(int id, CancellationToken cancellationToken)
-        => mediator.Send(new GetUserRequest(id), cancellationToken);
+    public Task<UserDto> Handle(GetUserQuery request, CancellationToken cancellationToken)
+        => users.GetAsync(request.Id, cancellationToken);
 }
 ```
 
-For requests without a result, return `Unit`:
+A request without a response:
 
 ```csharp
-public sealed record DeleteUserRequest(int Id) : IRequest<Unit>;
+public sealed record DeleteUserCommand(int Id) : IRequest;
 
-public sealed class DeleteUserHandler : IRequestHandler<DeleteUserRequest, Unit>
+public sealed class DeleteUserHandler(IUserRepository users) : IRequestHandler<DeleteUserCommand>
 {
-    public Task<Unit> Handle(DeleteUserRequest request, CancellationToken cancellationToken)
+    public Task Handle(DeleteUserCommand request, CancellationToken cancellationToken)
+        => users.DeleteAsync(request.Id, cancellationToken);
+}
+```
+
+Send them with `ISender`:
+
+```csharp
+app.MapGet("/users/{id:int}", (int id, ISender sender, CancellationToken ct)
+    => sender.Send(new GetUserQuery(id), ct));
+
+app.MapDelete("/users/{id:int}", async (int id, ISender sender, CancellationToken ct) =>
+{
+    await sender.Send(new DeleteUserCommand(id), ct);
+    return Results.NoContent();
+});
+```
+
+`IRequest<Unit>` with `return Unit.Value;` keeps working too, for code migrated from MediatR.
+
+## Notifications
+
+A notification can have zero or more handlers:
+
+```csharp
+public sealed record UserDeleted(int Id) : INotification;
+
+public sealed class SendGoodbyeEmail(IEmailSender email) : INotificationHandler<UserDeleted>
+{
+    public Task Handle(UserDeleted notification, CancellationToken cancellationToken) => /* ... */;
+}
+
+public sealed class WriteAuditLog(IAuditLog audit) : INotificationHandler<UserDeleted>
+{
+    public Task Handle(UserDeleted notification, CancellationToken cancellationToken) => /* ... */;
+}
+```
+
+Publish it with `IPublisher`:
+
+```csharp
+await publisher.Publish(new UserDeleted(id), cancellationToken);
+```
+
+## Pipeline behaviors
+
+Behaviors wrap the handling of a request. Call `next()` to continue to the next behavior or the handler, or return early to short-circuit:
+
+```csharp
+public sealed class LoggingBehavior<TRequest, TResponse>(ILogger<LoggingBehavior<TRequest, TResponse>> logger)
+    : IPipelineBehavior<TRequest, TResponse>
+    where TRequest : notnull
+{
+    public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
     {
-        // ...
-        return Unit.Task;
+        logger.LogInformation("Handling {Request}", typeof(TRequest).Name);
+        var response = await next();
+        logger.LogInformation("Handled {Request}", typeof(TRequest).Name);
+        return response;
     }
 }
 ```
 
+Register behaviors in the order they should run; the first one is the outermost:
+
+```csharp
+builder.Services.AddHerald(herald => herald
+    .RegisterServicesFromAssemblyContaining<Program>()
+    .AddOpenBehavior(typeof(LoggingBehavior<,>))     // applies to every request
+    .AddOpenBehavior(typeof(ValidationBehavior<,>))  // applies where its generic constraints match
+    .AddBehavior<CacheUserBehavior>());              // closed: applies to one request type only
+```
+
+An open behavior with a constraint such as `where TRequest : IValidatable` only runs for requests that satisfy it. Requests without a response flow through behaviors with `Unit` as `TResponse`.
+
 ## Behaviour
 
-- `IMediator` and handlers are registered as **transient**.
-- Each request type has exactly **one** handler; the first registration wins.
-- Abstract and open generic handler types are skipped during scanning.
-- Sending a request without a registered handler throws `InvalidOperationException`.
+- `IMediator`, `ISender`, `IPublisher`, handlers and behaviors are registered as **transient**.
+- Each request type has exactly **one** handler; the first registration wins. Sending a request without a handler throws `InvalidOperationException`.
+- Notification handlers run **one after another**, in registration order. Handlers are resolved for the notification's runtime type. The first handler that throws stops the rest. Publishing without handlers is a no-op.
+- Abstract and open generic handler types are skipped during scanning. Calling `AddHerald` more than once does not duplicate registrations.
 
 ## Migrating from MediatR
 
 1. Replace the `MediatR` package with `Herald`.
 2. Replace `using MediatR;` with `using Herald;`.
-3. Replace `AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<T>())` with `AddHeraldFromAssemblyContaining<T>()`.
+3. Replace `AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<T>())` with `AddHerald(cfg => cfg.RegisterServicesFromAssemblyContaining<T>())`. `AddOpenBehavior` and `AddBehavior` work the same way.
+4. In behaviors, call `next()` instead of MediatR 13's `next(cancellationToken)`; the token is passed to the handler for you.
 
-Only `IRequest<T>`, `IRequestHandler<TRequest, TResponse>`, `IMediator.Send` and `Unit` are supported.
+Not supported: streaming requests, pre/post processors, exception handlers and custom notification publishers.
 
 ## Releasing
 

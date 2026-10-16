@@ -1,0 +1,23 @@
+@host = http://localhost:5080
+
+### Create a todo
+# @name create
+POST {{host}}/todos
+Content-Type: application/json
+
+{ "title": "Try Herald" }
+
+### Create an invalid todo (rejected by ValidationBehavior → 400)
+POST {{host}}/todos
+Content-Type: application/json
+
+{ "title": "" }
+
+### List todos
+GET {{host}}/todos
+
+### Complete the todo (publishes TodoCompleted → 204)
+POST {{host}}/todos/{{create.response.body.$.id}}/complete
+
+### Completed count, updated by a notification handler
+GET {{host}}/stats

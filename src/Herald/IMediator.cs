@@ -1,16 +1,9 @@
 namespace Herald;
 
 /// <summary>
-/// Dispatches requests to their <see cref="IRequestHandler{TRequest,TResponse}"/>.
+/// Sends requests and publishes notifications.
 /// </summary>
-public interface IMediator
-{
-    /// <summary>
-    /// Sends a request to its single handler.
-    /// </summary>
-    /// <param name="request">The request.</param>
-    /// <param name="cancellationToken">The cancellation token.</param>
-    /// <typeparam name="TResponse">The type of the response.</typeparam>
-    /// <returns>The response of the handler.</returns>
-    Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken = default);
-}
+/// <remarks>
+/// Depend on <see cref="ISender"/> or <see cref="IPublisher"/> instead when a class only needs one of them.
+/// </remarks>
+public interface IMediator : ISender, IPublisher;

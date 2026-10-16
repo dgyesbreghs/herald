@@ -9,8 +9,8 @@
   <PropertyGroup Label="Package">
     <PackageId>Herald</PackageId>
     <Authors>Dylan Gyesbreghs</Authors>
-    <Description>Minimal in-process mediator for .NET. Send requests, resolve handlers via DI, nothing more.</Description>
-    <PackageTags>mediator;cqrs;dependency-injection;request;handler</PackageTags>
+    <Description>Minimal in-process mediator for .NET: requests, notifications and pipeline behaviors, resolved via DI.</Description>
+    <PackageTags>mediator;cqrs;dependency-injection;request;handler;notification;pipeline</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageProjectUrl>https://github.com/dgyesbreghs/herald</PackageProjectUrl>
@@ -19,7 +19,7 @@
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
