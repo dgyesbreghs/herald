@@ -70,6 +70,26 @@ public class PipelineBehaviorTests
     }
 
     [Test]
+    public async Task Send_ShortCircuitingBehavior_DoesNotConstructHandler()
+    {
+        await using var provider = TestServices.Build(c => c.AddBehavior<CachedExpensiveBehavior>());
+        var mediator = provider.GetRequiredService<IMediator>();
+
+        var response = await mediator.Send(new ExpensiveRequest());
+
+        Assert.That(response, Is.EqualTo("cached"));
+    }
+
+    [Test]
+    public void Send_VoidRequest_ShortCircuitingBehavior_DoesNotConstructHandler()
+    {
+        using var provider = TestServices.Build(c => c.AddBehavior<SkipExpensiveVoidBehavior>());
+        var mediator = provider.GetRequiredService<IMediator>();
+
+        Assert.DoesNotThrowAsync(() => mediator.Send(new ExpensiveVoidRequest()));
+    }
+
+    [Test]
     public void AddOpenBehavior_WithNonBehaviorType_Throws()
     {
         var configuration = new HeraldConfiguration();
@@ -153,6 +173,36 @@ public class PipelineBehaviorTests
             log.Add("audited");
             return next();
         }
+    }
+
+    public sealed record ExpensiveRequest : IRequest<string>;
+
+    public sealed record ExpensiveVoidRequest : IRequest;
+
+    public sealed class ExpensiveHandler : IRequestHandler<ExpensiveRequest, string>
+    {
+        public ExpensiveHandler() => throw new InvalidOperationException("Handler should not be constructed.");
+
+        public Task<string> Handle(ExpensiveRequest request, CancellationToken cancellationToken) => Task.FromResult("handled");
+    }
+
+    public sealed class ExpensiveVoidHandler : IRequestHandler<ExpensiveVoidRequest>
+    {
+        public ExpensiveVoidHandler() => throw new InvalidOperationException("Handler should not be constructed.");
+
+        public Task Handle(ExpensiveVoidRequest request, CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+
+    public sealed class CachedExpensiveBehavior : IPipelineBehavior<ExpensiveRequest, string>
+    {
+        public Task<string> Handle(ExpensiveRequest request, RequestHandlerDelegate<string> next, CancellationToken cancellationToken)
+            => Task.FromResult("cached");
+    }
+
+    public sealed class SkipExpensiveVoidBehavior : IPipelineBehavior<ExpensiveVoidRequest, Unit>
+    {
+        public Task<Unit> Handle(ExpensiveVoidRequest request, RequestHandlerDelegate<Unit> next, CancellationToken cancellationToken)
+            => Unit.Task;
     }
 
     public sealed class CachedEchoBehavior : IPipelineBehavior<EchoRequest, string>

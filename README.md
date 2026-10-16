@@ -28,13 +28,13 @@ dotnet add package Herald
 Or add a package reference to your project file:
 
 ```xml
-<PackageReference Include="Herald" Version="1.*" />
+<PackageReference Include="Herald" Version="2.*" />
 ```
 
 Or with [central package management](https://learn.microsoft.com/nuget/consume-packages/central-package-management) in `Directory.Packages.props`:
 
 ```xml
-<PackageVersion Include="Herald" Version="1.*" />
+<PackageVersion Include="Herald" Version="2.*" />
 ```
 
 ## Getting started
@@ -161,6 +161,10 @@ An open behavior with a constraint such as `where TRequest : IValidatable` only 
 - Notification handlers run **one after another**, in registration order. Handlers are resolved for the notification's runtime type. The first handler that throws stops the rest. Publishing without handlers is a no-op.
 - Abstract and open generic handler types are skipped during scanning. Calling `AddHerald` more than once does not duplicate registrations.
 
+## Upgrading from 1.x
+
+2.0 adds requests without a response, notifications and pipeline behaviors. Code that sends requests or registers Herald needs no changes. The only breaking change: `IMediator` now extends `ISender` and `IPublisher`, so a class that implements `IMediator` itself (e.g. a hand-written test fake) must also implement `Send(IRequest, CancellationToken)` and `Publish`. Mocks created with Moq or NSubstitute are unaffected.
+
 ## Migrating from MediatR
 
 1. Replace the `MediatR` package with `Herald`.
@@ -172,10 +176,10 @@ Not supported: streaming requests, pre/post processors, exception handlers and c
 
 ## Releasing
 
-Publishing a GitHub release (e.g. tag `v1.1.0`) triggers the `Publish` workflow, which tests, packs with the version from the tag and pushes to NuGet via Trusted Publishing.
+Publishing a GitHub release (e.g. tag `v2.1.0`) triggers the `Publish` workflow, which tests, packs with the version from the tag and pushes to NuGet via Trusted Publishing.
 
 ```bash
-gh release create v1.1.0 --generate-notes
+gh release create v2.1.0 --generate-notes
 ```
 
 ## License
