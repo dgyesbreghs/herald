@@ -1,8 +1,8 @@
 name: Publish
 
 on:
-  push:
-    tags: ['v*']
+  release:
+    types: [published]
 
 jobs:
   publish:
@@ -20,7 +20,9 @@ jobs:
       - name: Test
         run: dotnet test -c Release
       - name: Pack
-        run: dotnet pack src/Herald/Herald.csproj -c Release -o artifacts -p:Version=${GITHUB_REF_NAME#v}
+        run: dotnet pack src/Herald/Herald.csproj -c Release -o artifacts -p:Version=${TAG#v}
+        env:
+          TAG: ${{ github.event.release.tag_name }}
       - name: NuGet login (OIDC → temporary API key)
         uses: NuGet/login@v1
         id: login

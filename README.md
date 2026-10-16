@@ -78,6 +78,14 @@ public sealed class DeleteUserHandler : IRequestHandler<DeleteUserRequest, Unit>
 
 Only `IRequest<T>`, `IRequestHandler<TRequest, TResponse>`, `IMediator.Send` and `Unit` are supported.
 
+## Releasing
+
+Publishing a GitHub release (e.g. tag `v1.1.0`) triggers the `Publish` workflow, which tests, packs with the version from the tag and pushes to NuGet via Trusted Publishing.
+
+```bash
+gh release create v1.1.0 --generate-notes
+```
+
 ## License
 
 [MIT](LICENSE)
